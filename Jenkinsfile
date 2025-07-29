@@ -7,9 +7,13 @@ pipeline {
 
     stages {
 
-        stage('Checkout') {
+        stage('Clone') {
             steps {
-                git 'https://github.com/SumantharyaM/aws-devops-3tier-app.git'
+                git(
+                    url: 'https://github.com/SumantharyaM/aws-devops-3tier-app.git',
+                    branch: 'main',
+                    credentialsId: 'github-creds'
+                )
             }
         }
 
@@ -35,9 +39,9 @@ pipeline {
                     sh '''
                     docker build -t sumantharya/backend:latest ./backend
                     docker build -t sumantharya/frontend:latest ./frontend
-                    
+
                     echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin
-                    
+
                     docker push sumantharya/backend:latest
                     docker push sumantharya/frontend:latest
                     '''
@@ -62,12 +66,12 @@ pipeline {
         success {
             mail to: 'sumantharya1@gmail.com',
                  subject: "✅ Build Success",
-                 body: "The Jenkins build succeeded!"
+                 body: "The Jenkins build succeeded and was deployed to EKS."
         }
         failure {
             mail to: 'sumantharya1@gmail.com',
                  subject: "❌ Build Failed",
-                 body: "The Jenkins build failed."
+                 body: "The Jenkins build failed. Please check the logs."
         }
     }
 }
