@@ -1,4 +1,4 @@
-pipeline {
+wqpipeline {
     agent any
 
     environment {
@@ -30,10 +30,10 @@ pipeline {
             }
         }
 
-        stage('Build Backend with Maven') {
+        stage('Install Python Dependencies') {
             steps {
                 dir('backend') {
-                    sh 'mvn clean install'
+                    sh 'pip3 install -r requirements.txt'
                 }
             }
         }
