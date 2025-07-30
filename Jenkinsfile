@@ -27,6 +27,7 @@ pipeline {
                     /opt/sonar-scanner/bin/sonar-scanner \
                       -Dsonar.projectKey=aws-devops-3tier \
                       -Dsonar.sources=. \
+                      -Dsonar.exclusions=backend/venv/**/* \
                       -Dsonar.host.url=http://localhost:9000 \
                       -Dsonar.login=$SONAR_TOKEN
                     '''
@@ -39,7 +40,7 @@ pipeline {
                 dir('backend') {
                     sh '''
                     python3 -m venv venv
-                    source venv/bin/activate
+                    . venv/bin/activate
                     pip install --upgrade pip
                     pip install -r requirements.txt
                     '''
@@ -79,13 +80,13 @@ pipeline {
     post {
         success {
             mail to: 'sumantharya1@gmail.com',
-                 subject: "✅ Build Success",
-                 body: "The Jenkins build succeeded and was deployed to EKS."
+                 subject: "✅ Build Success - ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                 body: "🎉 Jenkins build succeeded and was deployed to EKS.\nCheck logs: ${env.BUILD_URL}"
         }
         failure {
             mail to: 'sumantharya1@gmail.com',
-                 subject: "❌ Build Failed",
-                 body: "The Jenkins build failed. Please check the logs."
+                 subject: "❌ Build Failed - ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                 body: "🚨 Jenkins build failed.\nCheck logs: ${env.BUILD_URL}"
         }
     }
 }
