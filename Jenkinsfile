@@ -6,17 +6,28 @@ pipeline {
     }
 
     stages {
+
         stage('Clone') {
             steps {
-                git credentialsId: 'github-creds', url: 'https://github.com/SumantharyaM/aws-devops-3tier-app.git'
+                git(
+                    url: 'https://github.com/SumantharyaM/aws-devops-3tier-app.git',
+                    branch: 'main',
+                    credentialsId: 'github-creds'
+                )
             }
         }
 
         stage('SonarQube Analysis') {
             steps {
                 withSonarQubeEnv('MySonarQube') {
-                    withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_TOKEN')]) {
-                        sh '/opt/sonar-scanner/bin/sonar-scanner -Dsonar.login=$SONAR_TOKEN'
+                    withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
+                        sh '''
+                          /opt/sonar-scanner/bin/sonar-scanner \
+                            -Dsonar.projectKey=aws-devops-3tier \
+                            -Dsonar.sources=. \
+                            -Dsonar.host.url=http://localhost:9000 \
+                            -Dsonar.token=$SONAR_TOKEN
+                        '''
                     }
                 }
             }
@@ -26,10 +37,10 @@ pipeline {
             steps {
                 dir('backend') {
                     sh '''
-                        python3 -m venv venv
-                        . venv/bin/activate
-                        pip install --upgrade pip
-                        pip install -r requirements.txt
+                      python3 -m venv venv
+                      . venv/bin/activate
+                      pip install --upgrade pip
+                      pip install -r requirements.txt
                     '''
                 }
             }
@@ -38,18 +49,22 @@ pipeline {
         stage('Docker Build & Push') {
             steps {
                 script {
-                    dockerImage = docker.build("sumantharya/aws-devops-3tier-backend")
-                    docker.withRegistry('', 'dockerhub-creds') {
-                        dockerImage.push("${env.BUILD_NUMBER}")
-                        dockerImage.push("latest")
-                    }
+                    sh '''
+                    docker build -t sumantharya/backend:latest ./backend
+                    docker build -t sumantharya/frontend:latest ./frontend
+
+                    echo "$DOCKERHUB_CREDENTIALS_PSW" | docker login -u "$DOCKERHUB_CREDENTIALS_USR" --password-stdin
+
+                    docker push sumantharya/backend:latest
+                    docker push sumantharya/frontend:latest
+                    '''
                 }
             }
         }
 
         stage('Trivy Scan') {
             steps {
-                sh 'trivy image --exit-code 0 --severity HIGH,CRITICAL sumantharya/aws-devops-3tier-backend:latest'
+                sh 'trivy image sumantharya/backend:latest || true'
             }
         }
 
@@ -62,15 +77,15 @@ pipeline {
 
     post {
         success {
-            mail to: 'your@email.com',
-                 subject: "SUCCESS: Jenkins Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]'",
-                 body: "Job succeeded: ${env.BUILD_URL}"
+            mail to: 'sumantharya1@gmail.com',
+                 subject: "✅ Build Success",
+                 body: "The Jenkins build succeeded and was deployed to EKS."
         }
-
         failure {
-            mail to: 'your@email.com',
-                 subject: "FAILURE: Jenkins Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]'",
-                 body: "Job failed: ${env.BUILD_URL}"
+            mail to: 'sumantharya1@gmail.com',
+                 subject: "❌ Build Failed",
+                 body: "The Jenkins build failed. Please check the logs."
         }
     }
 }
+
