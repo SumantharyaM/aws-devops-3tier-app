@@ -1,4 +1,4 @@
-wqpipeline {
+pipeline {
     agent any
 
     environment {
