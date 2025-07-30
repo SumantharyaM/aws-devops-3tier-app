@@ -18,16 +18,18 @@ pipeline {
         }
 
         stage('SonarQube Analysis') {
+            environment {
+                SONAR_TOKEN = credentials('sonar-token') // Store token as secret text
+            }
             steps {
                 withSonarQubeEnv('MySonarQube') {
-                    withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
-                        sh '''
-                        /opt/sonar-scanner/bin/sonar-scanner \
-                          -Dsonar.projectKey=aws-devops-3tier \
-                          -Dsonar.sources=. \
-                          -Dsonar.token=$SONAR_TOKEN
-                        '''
-                    }
+                    sh '''
+                    /opt/sonar-scanner/bin/sonar-scanner \
+                      -Dsonar.projectKey=aws-devops-3tier \
+                      -Dsonar.sources=. \
+                      -Dsonar.host.url=http://localhost:9000 \
+                      -Dsonar.login=$SONAR_TOKEN
+                    '''
                 }
             }
         }
@@ -35,27 +37,24 @@ pipeline {
         stage('Install Python Dependencies') {
             steps {
                 dir('backend') {
-                    sh '''
-                    python3 -m venv venv
-                    . venv/bin/activate
-                    pip install --upgrade pip
-                    pip install -r requirements.txt
-                    '''
+                    sh 'pip3 install -r requirements.txt'
                 }
             }
         }
 
         stage('Docker Build & Push') {
             steps {
-                sh '''
-                docker build -t sumantharya/backend:latest ./backend
-                docker build -t sumantharya/frontend:latest ./frontend
+                script {
+                    sh '''
+                    docker build -t sumantharya/backend:latest ./backend
+                    docker build -t sumantharya/frontend:latest ./frontend
 
-                echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin
+                    echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin
 
-                docker push sumantharya/backend:latest
-                docker push sumantharya/frontend:latest
-                '''
+                    docker push sumantharya/backend:latest
+                    docker push sumantharya/frontend:latest
+                    '''
+                }
             }
         }
 
@@ -85,4 +84,3 @@ pipeline {
         }
     }
 }
-
