@@ -22,11 +22,10 @@ pipeline {
                 withSonarQubeEnv('MySonarQube') {
                     withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
                         sh '''
-                          /opt/sonar-scanner/bin/sonar-scanner \
-                            -Dsonar.projectKey=aws-devops-3tier \
-                            -Dsonar.sources=. \
-                            -Dsonar.host.url=http://localhost:9000 \
-                            -Dsonar.token=$SONAR_TOKEN
+                        /opt/sonar-scanner/bin/sonar-scanner \
+                          -Dsonar.projectKey=aws-devops-3tier \
+                          -Dsonar.sources=. \
+                          -Dsonar.token=$SONAR_TOKEN
                         '''
                     }
                 }
@@ -37,10 +36,10 @@ pipeline {
             steps {
                 dir('backend') {
                     sh '''
-                      python3 -m venv venv
-                      . venv/bin/activate
-                      pip install --upgrade pip
-                      pip install -r requirements.txt
+                    python3 -m venv venv
+                    . venv/bin/activate
+                    pip install --upgrade pip
+                    pip install -r requirements.txt
                     '''
                 }
             }
@@ -48,23 +47,21 @@ pipeline {
 
         stage('Docker Build & Push') {
             steps {
-                script {
-                    sh '''
-                    docker build -t sumantharya/backend:latest ./backend
-                    docker build -t sumantharya/frontend:latest ./frontend
+                sh '''
+                docker build -t sumantharya/backend:latest ./backend
+                docker build -t sumantharya/frontend:latest ./frontend
 
-                    echo "$DOCKERHUB_CREDENTIALS_PSW" | docker login -u "$DOCKERHUB_CREDENTIALS_USR" --password-stdin
+                echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin
 
-                    docker push sumantharya/backend:latest
-                    docker push sumantharya/frontend:latest
-                    '''
-                }
+                docker push sumantharya/backend:latest
+                docker push sumantharya/frontend:latest
+                '''
             }
         }
 
         stage('Trivy Scan') {
             steps {
-                sh 'trivy image sumantharya/backend:latest || true'
+                sh 'trivy image sumantharya/backend:latest'
             }
         }
 
