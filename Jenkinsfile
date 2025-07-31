@@ -3,7 +3,6 @@ pipeline {
 
     environment {
         DOCKERHUB_CREDENTIALS = credentials('dockerhub-creds')
-        AWS_CREDS = credentials('aws-creds')
     }
 
     stages {
@@ -71,11 +70,10 @@ pipeline {
 
         stage('Deploy to Kubernetes (EKS)') {
             steps {
-                withEnv([
-                    "AWS_ACCESS_KEY_ID=${AWS_CREDS_USR}",
-                    "AWS_SECRET_ACCESS_KEY=${AWS_CREDS_PSW}",
-                    "AWS_DEFAULT_REGION=ap-south-1"
-                ]) {
+                withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding',
+                    credentialsId: 'aws-creds'
+                ]]) {
                     sh '''
                     aws eks update-kubeconfig --region ap-south-1 --name devops-cluster
                     kubectl apply -f k8s/ --validate=false
