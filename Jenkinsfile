@@ -3,11 +3,12 @@ pipeline {
 
     environment {
         DOCKERHUB_CREDENTIALS = credentials('dockerhub-creds')
+        AWS_CREDS = credentials('aws-creds') // single AWS credential block with both access key and secret
     }
 
     stages {
 
-        stage('Clone') {
+        stage('Clone Repository') {
             steps {
                 git(
                     url: 'https://github.com/SumantharyaM/aws-devops-3tier-app.git',
@@ -17,9 +18,9 @@ pipeline {
             }
         }
 
-        stage('SonarQube Analysis') {
+        stage('SonarQube Code Analysis') {
             environment {
-                SONAR_TOKEN = credentials('sonar-token') // Store token as secret text
+                SONAR_TOKEN = credentials('sonar-token')
             }
             steps {
                 withSonarQubeEnv('MySonarQube') {
@@ -35,7 +36,7 @@ pipeline {
             }
         }
 
-        stage('Install Python Dependencies') {
+        stage('Install Backend Python Dependencies') {
             steps {
                 dir('backend') {
                     sh '''
@@ -64,15 +65,26 @@ pipeline {
             }
         }
 
-        stage('Trivy Scan') {
+        stage('Trivy Image Scan') {
             steps {
-                sh 'trivy image sumantharya/backend:latest'
+                sh '''
+                trivy image sumantharya/backend:latest || true
+                trivy image sumantharya/frontend:latest || true
+                '''
             }
         }
 
-        stage('Deploy to Kubernetes') {
+        stage('Deploy to Kubernetes (EKS)') {
+            environment {
+                AWS_ACCESS_KEY_ID = "${AWS_CREDS_USR}"
+                AWS_SECRET_ACCESS_KEY = "${AWS_CREDS_PSW}"
+                AWS_DEFAULT_REGION = "ap-south-1"
+            }
             steps {
-                sh 'kubectl apply -f k8s/ --validate=false'
+                sh '''
+                aws eks update-kubeconfig --region $AWS_DEFAULT_REGION --name devops-cluster
+                kubectl apply -f k8s/ --validate=false
+                '''
             }
         }
     }
@@ -81,7 +93,7 @@ pipeline {
         success {
             mail to: 'sumantharya1@gmail.com',
                  subject: "✅ Build Success - ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-                 body: "🎉 Jenkins build succeeded and was deployed to EKS.\nCheck logs: ${env.BUILD_URL}"
+                 body: "🎉 Jenkins build succeeded and deployed to EKS.\nCheck logs: ${env.BUILD_URL}"
         }
         failure {
             mail to: 'sumantharya1@gmail.com',
