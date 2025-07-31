@@ -64,18 +64,23 @@ pipeline {
 
         stage('Trivy Scan') {
             steps {
-                sh 'trivy image sumantharya/backend:latest --skip-update'
+                sh 'trivy image sumantharya/backend:latest --skip-update --skip-version-check'
             }
         }
 
         stage('Deploy to Kubernetes (EKS)') {
             steps {
-                withCredentials([[
+                withCredentials([[ 
                     $class: 'AmazonWebServicesCredentialsBinding',
                     credentialsId: 'aws-creds'
                 ]]) {
                     sh '''
                     aws eks update-kubeconfig --region ap-south-1 --name devops-cluster
+                    
+                    # Create dev namespace if it doesn't exist
+                    kubectl get namespace dev || kubectl create namespace dev
+
+                    # Deploy Kubernetes resources
                     kubectl apply -f k8s/ --validate=false
                     '''
                 }
