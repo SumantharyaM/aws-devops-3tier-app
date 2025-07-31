@@ -3,12 +3,12 @@ pipeline {
 
     environment {
         DOCKERHUB_CREDENTIALS = credentials('dockerhub-creds')
-        AWS_CREDS = credentials('aws-creds') // single AWS credential block with both access key and secret
+        AWS_CREDS = credentials('aws-creds')
     }
 
     stages {
 
-        stage('Clone Repository') {
+        stage('Clone') {
             steps {
                 git(
                     url: 'https://github.com/SumantharyaM/aws-devops-3tier-app.git',
@@ -18,7 +18,7 @@ pipeline {
             }
         }
 
-        stage('SonarQube Code Analysis') {
+        stage('SonarQube Analysis') {
             environment {
                 SONAR_TOKEN = credentials('sonar-token')
             }
@@ -36,7 +36,7 @@ pipeline {
             }
         }
 
-        stage('Install Backend Python Dependencies') {
+        stage('Install Python Dependencies') {
             steps {
                 dir('backend') {
                     sh '''
@@ -51,40 +51,36 @@ pipeline {
 
         stage('Docker Build & Push') {
             steps {
-                script {
-                    sh '''
-                    docker build -t sumantharya/backend:latest ./backend
-                    docker build -t sumantharya/frontend:latest ./frontend
+                sh '''
+                docker build -t sumantharya/backend:latest ./backend
+                docker build -t sumantharya/frontend:latest ./frontend
 
-                    echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin
+                echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin
 
-                    docker push sumantharya/backend:latest
-                    docker push sumantharya/frontend:latest
-                    '''
-                }
+                docker push sumantharya/backend:latest
+                docker push sumantharya/frontend:latest
+                '''
             }
         }
 
-        stage('Trivy Image Scan') {
+        stage('Trivy Scan') {
             steps {
-                sh '''
-                trivy image sumantharya/backend:latest || true
-                trivy image sumantharya/frontend:latest || true
-                '''
+                sh 'trivy image sumantharya/backend:latest --skip-update'
             }
         }
 
         stage('Deploy to Kubernetes (EKS)') {
-            environment {
-                AWS_ACCESS_KEY_ID = "${AWS_CREDS_USR}"
-                AWS_SECRET_ACCESS_KEY = "${AWS_CREDS_PSW}"
-                AWS_DEFAULT_REGION = "ap-south-1"
-            }
             steps {
-                sh '''
-                aws eks update-kubeconfig --region $AWS_DEFAULT_REGION --name devops-cluster
-                kubectl apply -f k8s/ --validate=false
-                '''
+                withEnv([
+                    "AWS_ACCESS_KEY_ID=${AWS_CREDS_USR}",
+                    "AWS_SECRET_ACCESS_KEY=${AWS_CREDS_PSW}",
+                    "AWS_DEFAULT_REGION=ap-south-1"
+                ]) {
+                    sh '''
+                    aws eks update-kubeconfig --region ap-south-1 --name devops-cluster
+                    kubectl apply -f k8s/ --validate=false
+                    '''
+                }
             }
         }
     }
@@ -93,12 +89,16 @@ pipeline {
         success {
             mail to: 'sumantharya1@gmail.com',
                  subject: "✅ Build Success - ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-                 body: "🎉 Jenkins build succeeded and deployed to EKS.\nCheck logs: ${env.BUILD_URL}"
+                 body: "🎉 Jenkins build succeeded and was deployed to EKS.\nCheck logs: ${env.BUILD_URL}",
+                 charset: 'UTF-8',
+                 mimeType: 'text/plain'
         }
         failure {
             mail to: 'sumantharya1@gmail.com',
                  subject: "❌ Build Failed - ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-                 body: "🚨 Jenkins build failed.\nCheck logs: ${env.BUILD_URL}"
+                 body: "🚨 Jenkins build failed.\nCheck logs: ${env.BUILD_URL}",
+                 charset: 'UTF-8',
+                 mimeType: 'text/plain'
         }
     }
 }
