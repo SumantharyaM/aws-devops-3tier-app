@@ -1,7 +1,11 @@
 from flask import Flask, jsonify
+from flask_cors import CORS
 from dynamo_client import get_items
 
 app = Flask(__name__)
+
+# ✅ Fully allow CORS from any origin for testing (TEMPORARY)
+CORS(app, resources={r"/*": {"origins": "*"}})
 
 @app.route('/')
 def home():
@@ -13,4 +17,3 @@ def data():
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000)
-
